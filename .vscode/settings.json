@@ -1,0 +1,11 @@
+{
+    "files.exclude": {
+        "**/.git": false,
+        "**/*.js": {
+            "when": "$(basename).ts"
+        },
+        "**/**.js": {
+            "when": "$(basename).tsx"
+        }
+    }
+}

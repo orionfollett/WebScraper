@@ -1,0 +1,36 @@
+{
+    "name": "auction-scraper",
+    "version": "1.0.0",
+    "description": "Puppeteer Example Using Typescript",
+    "main": "index.js",
+    "scripts": {
+        "build": "tsc --outDir dist",
+        "start": "npm run build && node ./dist/src/scraper.js"
+    },
+    "author": "Orion",
+    "dependencies": {
+        "blob": "^0.1.0",
+        "csv-writer": "^1.6.0",
+        "export-to-csv": "^0.2.1",
+        "json-2-csv": "^3.18.0",
+        "json-to-csv-export": "^2.1.1",
+        "puppeteer": "^1.17.0"
+    },
+    "devDependencies": {
+        "@types/chai": "^4.1.7",
+        "@types/mocha": "^5.2.7",
+        "@types/node": "^12.20.55",
+        "@types/puppeteer": "^1.12.4",
+        "chai": "^4.2.0",
+        "copyfiles": "^2.1.0",
+        "it-each": "^0.4.0",
+        "mocha": "^6.1.4",
+        "mochawesome": "^4.0.0",
+        "puppeteer-debug": "^1.0.1",
+        "rimraf": "^2.6.3",
+        "ts-node": "^8.2.0",
+        "tslint": "^5.17.0",
+        "tslint-config-airbnb": "^5.11.1",
+        "typescript": "^3.5.1"
+    }
+}
