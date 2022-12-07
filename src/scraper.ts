@@ -1,8 +1,9 @@
 import { ElementHandle, Browser, Page } from "puppeteer";
 import { AuctionDetails, AuctionDetailsList, EmptyAuctionDetails } from "./Models/auction-details.interface";
-import { convertCSV } from "./Shared/JsonToCSV";
-import * as countiesJson from "../Counties/counties.json";
+import { writeCSV, appendCSV } from "./Shared/JsonToCSV";
+import * as countiesJson from "./Counties/counties.json";
 import { resourceLimits } from "worker_threads";
+import { appendFile } from "fs";
 
 //Command to run
 //npm --date=11/18/2022 --county=summit --count=3 run start
@@ -69,7 +70,6 @@ async function scrape(url : string) : Promise<string>{
     await page.goto(url, {waitUntil: "networkidle2"});
   }
   catch(error){
-    console.log(error);
     return "";
   }
   
@@ -85,14 +85,20 @@ async function scrape(url : string) : Promise<string>{
 
 async function GetNextAuction(page : Page) : Promise<string>{
     let nextAuctionUrl = "";
+    try{
     const allLinks = await page.$$('a');//get all links
     await Promise.all(allLinks.map(async (val) => {
-    let text : string = await (await val.getProperty('textContent')).jsonValue();
-    if(text.indexOf(selectors.NEXT_AUCTION) != -1){ //check the text content
-        console.log(text);
-        nextAuctionUrl = await (await val.getProperty('href')).jsonValue();
+        let text : string = await (await val.getProperty('textContent')).jsonValue();
+        if(text.indexOf(selectors.NEXT_AUCTION) != -1){ //check the text content
+            console.log(text);
+            nextAuctionUrl = await (await val.getProperty('href')).jsonValue();
+        }
+    }));
     }
-  }));
+    catch(error){
+        console.log("end of auctions reached");
+    }
+
     return nextAuctionUrl;
 }
 
@@ -124,13 +130,13 @@ async function ParseAuctionDetails(auctionDetails : ElementHandle[], url : strin
         // console.log("TABLE DATA: " + tableValues);
         // console.log(tablePairs);
 
-        auctionDetails.caseId = tablePairs[tableSelectors.CASE_NUM].trim();
-        auctionDetails.parcelId = tablePairs[tableSelectors.PARCEL_ID].trim();
-        auctionDetails.address = tablePairs[tableSelectors.ADDRESS].trim()
-        auctionDetails.county = tablePairs[tableSelectors.CITY].trim()
-        auctionDetails.appraisedValue = tablePairs[tableSelectors.APPRAISED_VALUE].trim()
-        auctionDetails.openingBid = tablePairs[tableSelectors.OPENING_BID].trim()
-        auctionDetails.requiredDeposit = tablePairs[tableSelectors.DEPOSIT].trim()
+        auctionDetails.caseId = tablePairs[tableSelectors.CASE_NUM]?.trim();
+        auctionDetails.parcelId = tablePairs[tableSelectors.PARCEL_ID]?.trim();
+        auctionDetails.address = tablePairs[tableSelectors.ADDRESS]?.trim()
+        auctionDetails.county = tablePairs[tableSelectors.CITY]?.trim()
+        auctionDetails.appraisedValue = tablePairs[tableSelectors.APPRAISED_VALUE]?.trim()
+        auctionDetails.openingBid = tablePairs[tableSelectors.OPENING_BID]?.trim()
+        auctionDetails.requiredDeposit = tablePairs[tableSelectors.DEPOSIT]?.trim()
         auctionDetails.date = getDateFromUrl(url);
         auctionDetails.link = url;
         result.auctionDetailsList.push(auctionDetails);
@@ -163,6 +169,15 @@ function formatUrl(date : string, county : string){
     return res.replace("{date}", date);
 }
 
+function isAfterStartingDate(date : string) : boolean{
+    let d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+
+    let startingD = new Date(getDateFromUrl(startingUrl));
+    startingD.setHours(0, 0, 0, 0);
+    return !(d < startingD);
+}
+
 async function main() : Promise<void>{
     console.log("STARTING SCRAPE:");
     console.log("Num Auctions: " + auctionCount);
@@ -181,24 +196,35 @@ async function main() : Promise<void>{
     for(let i = 0; i < counties.length; i++){
         let nextUrl = formatUrl(date, counties[i]);
         for(let j = 0; j < auctionCount; j++){
-            if(nextUrl != ""){
+            if(nextUrl != "" || isAfterStartingDate(getDateFromUrl(nextUrl))){
                 nextUrl = await scrape(nextUrl);
+            }
+            else{
+                break;
             }
         }
     }
     //write all the data to a file
-    convertCSV(fileName, finalResult);
+    writeCSV(fileName, finalResult);
 }
 
-main();
-console.log("DONE");
+
+(async () => {
+    appendCSV(1, 1);
+    //await main();
+    console.log("DONE");
+    process.exit(0);
+})();
+
 
 //BUG LOG:
 /*
+- some posts have multiple pages
+- add timer to check performance
+- check date so that dates don't wrap around twice
+
+FIXED:
 - data table can have fewer rows in some cases: see case id: CV2019062353, url: https://summit.sheriffsaleauction.ohio.gov/index.cfm?zaction=AUCTION&zmethod=PREVIEW&AuctionDate=07/22/2022
 - another example: https://logan.sheriffsaleauction.ohio.gov/index.cfm?zaction=AUCTION&zmethod=PREVIEW&AuctionDate=07/20/2022
 - summit county is searched twice
-- some posts have multiple pages
-- add timer to check performance
-- check date
 */

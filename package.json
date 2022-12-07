@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "build": "tsc --outDir dist",
-        "start": "npm run build && node ./dist/src/scraper.js"
+        "start": "npm run build && node ./dist/scraper.js"
     },
     "author": "Orion",
     "dependencies": {
