@@ -2,6 +2,7 @@ import { ElementHandle, Browser, Page } from "puppeteer";
 import { AuctionDetails, AuctionDetailsList, EmptyAuctionDetails } from "./Models/auction-details.interface";
 import { convertCSV } from "./Shared/JsonToCSV";
 import * as countiesJson from "../Counties/counties.json";
+import { resourceLimits } from "worker_threads";
 
 //Command to run
 //npm --date=11/18/2022 --county=summit --count=3 run start
@@ -15,14 +16,26 @@ const selectors = {
     AMOUNT_SOLD_FOR : 'div.ASTAT_MSGD.Astat_DATA', 
     SOLD_TO : 'div.ASTAT_MSG_SOLDTO_MSG.Astat_DATA',
     TABLE : 'table tr td',
+    TABLE_HEADER : 'table tr th',
     NEXT_AUCTION : 'Next Auction'
+};
+
+const tableSelectors = {
+    CASE_STATUS : 'Case Status:',
+    CASE_NUM : 'Case #:',
+    PARCEL_ID : 'Parcel ID:',
+    ADDRESS : 'Property Address:',
+    APPRAISED_VALUE : 'Appraised Value:',
+    OPENING_BID : 'Opening Bid:',
+    DEPOSIT : 'Deposit Requirement:',
+    CITY : ''
 };
 
 //get args
 let county: string | undefined = process.env.npm_config_county; // if it's all, will get from config file
 let date: string | undefined = process.env.npm_config_date; // starting date
-//let auctionCount: number | undefined = parseInt(process.env.npm_config_count); // number of auctions past starting date
-let auctionCount = 12;
+let auctionCount: number | undefined = parseInt(process.env.npm_config_count); // number of auctions past starting date
+//let auctionCount = 3;
 
 if(!county){
     console.log("missing county arg!");
@@ -93,24 +106,45 @@ async function ParseAuctionDetails(auctionDetails : ElementHandle[], url : strin
         let amount = await elementToText(auctionDetail, selectors.AMOUNT_SOLD_FOR);
         let soldTo = await elementToText(auctionDetail, selectors.SOLD_TO);
         auctionDetails.status = await elementToText(auctionDetail, selectors.STATUS);
-        const tableData = await auctionDetail.$$eval(selectors.TABLE, tds => tds.map((td) => {
+
+        const tableHeaders = await auctionDetail.$$eval(selectors.TABLE_HEADER, ths => ths.map((th) => {
+            return th.textContent;
+        }));
+
+        const tableValues = await auctionDetail.$$eval(selectors.TABLE, tds => tds.map((td) => {
             return td.textContent;
         }));
 
         auctionDetails.amountSoldFor = amount;
         auctionDetails.soldTo = soldTo;
-        
-        auctionDetails.caseId = tableData[1].trim();
-        auctionDetails.parcelId = tableData[2].trim();
-        auctionDetails.address = tableData[3];
-        auctionDetails.county = tableData[4];
-        auctionDetails.appraisedValue = tableData[5];
-        auctionDetails.openingBid = tableData[6];
-        auctionDetails.requiredDeposit = tableData[7];
+
+        const tablePairs: {[key: string]: string} = translateHeadersToData(tableHeaders, tableValues);
+
+        // console.log("TABLE HEADERS: " + tableHeaders);
+        // console.log("TABLE DATA: " + tableValues);
+        // console.log(tablePairs);
+
+        auctionDetails.caseId = tablePairs[tableSelectors.CASE_NUM].trim();
+        auctionDetails.parcelId = tablePairs[tableSelectors.PARCEL_ID].trim();
+        auctionDetails.address = tablePairs[tableSelectors.ADDRESS].trim()
+        auctionDetails.county = tablePairs[tableSelectors.CITY].trim()
+        auctionDetails.appraisedValue = tablePairs[tableSelectors.APPRAISED_VALUE].trim()
+        auctionDetails.openingBid = tablePairs[tableSelectors.OPENING_BID].trim()
+        auctionDetails.requiredDeposit = tablePairs[tableSelectors.DEPOSIT].trim()
         auctionDetails.date = getDateFromUrl(url);
         auctionDetails.link = url;
         result.auctionDetailsList.push(auctionDetails);
     }));
+
+    return result;
+}
+
+function translateHeadersToData(keys : string[], values : string[]) : {[key: string]: string} {
+    let result : {[key: string]: string} = {};
+
+    keys.map((val, index) => {
+        result[val] = values[index];
+    });
 
     return result;
 }
@@ -130,20 +164,14 @@ function formatUrl(date : string, county : string){
 }
 
 async function main() : Promise<void>{
-    console.log("is this even building?");
     console.log("STARTING SCRAPE:");
     console.log("Num Auctions: " + auctionCount);
   
     if(county == "all"){
-        //grab list of all counties
         counties = countiesJson["all-counties"];
-        console.log("all counties json: ");
-        console.log(countiesJson);
     }
     else if(county == "close"){
         counties = countiesJson.closeCounties;
-        console.log("close counties json: ");
-        console.log(countiesJson);
     }
     else{
         counties.push(county);
@@ -163,3 +191,14 @@ async function main() : Promise<void>{
 }
 
 main();
+console.log("DONE");
+
+//BUG LOG:
+/*
+- data table can have fewer rows in some cases: see case id: CV2019062353, url: https://summit.sheriffsaleauction.ohio.gov/index.cfm?zaction=AUCTION&zmethod=PREVIEW&AuctionDate=07/22/2022
+- another example: https://logan.sheriffsaleauction.ohio.gov/index.cfm?zaction=AUCTION&zmethod=PREVIEW&AuctionDate=07/20/2022
+- summit county is searched twice
+- some posts have multiple pages
+- add timer to check performance
+- check date
+*/

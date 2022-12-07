@@ -1,6 +1,5 @@
 {
     "all-counties" : [
-        "summit",
         "adams",
         "allen",
         "ashland",
@@ -80,7 +79,7 @@
         "Trumbull",
         "Tuscarawas",
         "Union",
-        "Van Wert",
+        "vanwert",
         "Vinton",
         "Warren",
         "Washington",
@@ -101,6 +100,7 @@
         "ashland",
         "wayne",
         "erie",
-        "huron"
+        "huron",
+        "greene"
     ]
 }

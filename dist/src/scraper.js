@@ -53,11 +53,22 @@ var selectors = {
     AMOUNT_SOLD_FOR: 'div.ASTAT_MSGD.Astat_DATA',
     SOLD_TO: 'div.ASTAT_MSG_SOLDTO_MSG.Astat_DATA',
     TABLE: 'table tr td',
+    TABLE_HEADER: 'table tr th',
     NEXT_AUCTION: 'Next Auction'
+};
+var tableSelectors = {
+    CASE_STATUS: 'Case Status:',
+    CASE_NUM: 'Case #:',
+    PARCEL_ID: 'Parcel ID:',
+    ADDRESS: 'Property Address:',
+    APPRAISED_VALUE: 'Appraised Value:',
+    OPENING_BID: 'Opening Bid:',
+    DEPOSIT: 'Deposit Requirement:',
+    CITY: ''
 };
 var county = process.env.npm_config_county;
 var date = process.env.npm_config_date;
-var auctionCount = 12;
+var auctionCount = parseInt(process.env.npm_config_count);
 if (!county) {
     console.log("missing county arg!");
     process.exit(1);
@@ -162,7 +173,7 @@ function ParseAuctionDetails(auctionDetails, url) {
                 case 0:
                     result = { auctionDetailsList: [] };
                     return [4, Promise.all(auctionDetails.map(function (auctionDetail) { return __awaiter(_this, void 0, void 0, function () {
-                            var auctionDetails, amount, soldTo, _a, tableData;
+                            var auctionDetails, amount, soldTo, _a, tableHeaders, tableValues, tablePairs;
                             return __generator(this, function (_b) {
                                 switch (_b.label) {
                                     case 0:
@@ -177,20 +188,26 @@ function ParseAuctionDetails(auctionDetails, url) {
                                         return [4, elementToText(auctionDetail, selectors.STATUS)];
                                     case 3:
                                         _a.status = _b.sent();
+                                        return [4, auctionDetail.$$eval(selectors.TABLE_HEADER, function (ths) { return ths.map(function (th) {
+                                                return th.textContent;
+                                            }); })];
+                                    case 4:
+                                        tableHeaders = _b.sent();
                                         return [4, auctionDetail.$$eval(selectors.TABLE, function (tds) { return tds.map(function (td) {
                                                 return td.textContent;
                                             }); })];
-                                    case 4:
-                                        tableData = _b.sent();
+                                    case 5:
+                                        tableValues = _b.sent();
                                         auctionDetails.amountSoldFor = amount;
                                         auctionDetails.soldTo = soldTo;
-                                        auctionDetails.caseId = tableData[1].trim();
-                                        auctionDetails.parcelId = tableData[2].trim();
-                                        auctionDetails.address = tableData[3];
-                                        auctionDetails.county = tableData[4];
-                                        auctionDetails.appraisedValue = tableData[5];
-                                        auctionDetails.openingBid = tableData[6];
-                                        auctionDetails.requiredDeposit = tableData[7];
+                                        tablePairs = translateHeadersToData(tableHeaders, tableValues);
+                                        auctionDetails.caseId = tablePairs[tableSelectors.CASE_NUM].trim();
+                                        auctionDetails.parcelId = tablePairs[tableSelectors.PARCEL_ID].trim();
+                                        auctionDetails.address = tablePairs[tableSelectors.ADDRESS].trim();
+                                        auctionDetails.county = tablePairs[tableSelectors.CITY].trim();
+                                        auctionDetails.appraisedValue = tablePairs[tableSelectors.APPRAISED_VALUE].trim();
+                                        auctionDetails.openingBid = tablePairs[tableSelectors.OPENING_BID].trim();
+                                        auctionDetails.requiredDeposit = tablePairs[tableSelectors.DEPOSIT].trim();
                                         auctionDetails.date = getDateFromUrl(url);
                                         auctionDetails.link = url;
                                         result.auctionDetailsList.push(auctionDetails);
@@ -204,6 +221,13 @@ function ParseAuctionDetails(auctionDetails, url) {
             }
         });
     });
+}
+function translateHeadersToData(keys, values) {
+    var result = {};
+    keys.map(function (val, index) {
+        result[val] = values[index];
+    });
+    return result;
 }
 function elementToText(element, dataSelector) {
     return __awaiter(this, void 0, void 0, function () {
@@ -232,18 +256,13 @@ function main() {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    console.log("is this even building?");
                     console.log("STARTING SCRAPE:");
                     console.log("Num Auctions: " + auctionCount);
                     if (county == "all") {
                         counties = countiesJson["all-counties"];
-                        console.log("all counties json: ");
-                        console.log(countiesJson);
                     }
                     else if (county == "close") {
                         counties = countiesJson.closeCounties;
-                        console.log("close counties json: ");
-                        console.log(countiesJson);
                     }
                     else {
                         counties.push(county);
@@ -277,4 +296,5 @@ function main() {
     });
 }
 main();
+console.log("DONE");
 //# sourceMappingURL=scraper.js.map
