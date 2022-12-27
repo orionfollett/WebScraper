@@ -1,4 +1,4 @@
-const { writeFile, readFile } = require('fs').promises;
+const { writeFile, appendFile } = require('fs').promises;
 const { json2csvAsync } = require('json-2-csv');
 
 export async function writeCSV(fileName, data) {
@@ -6,16 +6,21 @@ export async function writeCSV(fileName, data) {
     await writeFile(fileName, csv, 'utf8');
 }
 
-//does not append data already within the csv
-export async function appendCSV(fileName, data) {
-    translateFile('../auctionData.csv');
-}
+//does not delete data already within the csv
+export async function appendCSV(fileName : string, data, skipFirstLine : boolean) {
+    let csv = await json2csvAsync(data);
 
-async function translateFile(fileName : string) : Promise<string>{
-    const fileContents = await readFile(
-        fileName,
-        { encoding: 'utf-8' },
-    );
-    console.log(fileContents);
-    return fileContents;
+    if(skipFirstLine){
+        let newCsv = [];
+        let lines = csv.split("\n");
+        lines.forEach(function(item, i) {
+            if(i !== 0){
+                newCsv.push(item);
+            } 
+        })
+  
+        csv = newCsv.join("\n");
+    }
+
+    await appendFile(fileName, csv + "\n", 'utf8');
 }

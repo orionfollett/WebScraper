@@ -54,8 +54,9 @@ if(!auctionCount){
 }
 
 //file to write too
-const fileName : string = "auctionData.csv";
+const fileName : string = "auctionData2.csv";
 let finalResult : AuctionDetails[] = [];
+let firstScrape = true;
 
 //format url
 const startingUrl : string = "https://{county}.sheriffsaleauction.ohio.gov/index.cfm?zaction=AUCTION&zmethod=PREVIEW&AuctionDate={date}";
@@ -66,17 +67,27 @@ async function scrape(url : string) : Promise<string>{
   console.log("URL: " + url);
   const browser : Browser = await puppeteer.launch();
   const page : Page = await browser.newPage();
+
   try{
     await page.goto(url, {waitUntil: "networkidle2"});
   }
   catch(error){
+    await browser.close();
     return "";
   }
   
   const auctionDetails : ElementHandle[] = await page.$$(selectors.AUCTION_DETAILS);
   const data : AuctionDetailsList = await ParseAuctionDetails(auctionDetails, url);
   
-  finalResult = [...finalResult, ...data.auctionDetailsList];
+  //finalResult = [...finalResult, ...data.auctionDetailsList];
+  if(firstScrape){
+    console.log("first scrape");
+    await writeCSV(fileName, EmptyAuctionDetails());
+    //await appendCSV(fileName, ["\n"], false);
+    firstScrape = false;
+  }
+
+  await appendCSV(fileName, data.auctionDetailsList, true);
   
   const nextAuction : string = await GetNextAuction(page);
   await browser.close();
@@ -132,13 +143,18 @@ async function ParseAuctionDetails(auctionDetails : ElementHandle[], url : strin
 
         auctionDetails.caseId = tablePairs[tableSelectors.CASE_NUM]?.trim();
         auctionDetails.parcelId = tablePairs[tableSelectors.PARCEL_ID]?.trim();
-        auctionDetails.address = tablePairs[tableSelectors.ADDRESS]?.trim()
-        auctionDetails.county = tablePairs[tableSelectors.CITY]?.trim()
-        auctionDetails.appraisedValue = tablePairs[tableSelectors.APPRAISED_VALUE]?.trim()
-        auctionDetails.openingBid = tablePairs[tableSelectors.OPENING_BID]?.trim()
-        auctionDetails.requiredDeposit = tablePairs[tableSelectors.DEPOSIT]?.trim()
+        auctionDetails.address = tablePairs[tableSelectors.ADDRESS]?.trim();
+        auctionDetails.county = tablePairs[tableSelectors.CITY]?.trim();
+        auctionDetails.appraisedValue = tablePairs[tableSelectors.APPRAISED_VALUE]?.trim();
+        auctionDetails.openingBid = tablePairs[tableSelectors.OPENING_BID]?.trim();
+        auctionDetails.requiredDeposit = tablePairs[tableSelectors.DEPOSIT]?.trim();
         auctionDetails.date = getDateFromUrl(url);
         auctionDetails.link = url;
+
+        if(!auctionDetails.county){
+            auctionDetails.county = county;
+        }
+
         result.auctionDetailsList.push(auctionDetails);
     }));
 
@@ -196,7 +212,7 @@ async function main() : Promise<void>{
     for(let i = 0; i < counties.length; i++){
         let nextUrl = formatUrl(date, counties[i]);
         for(let j = 0; j < auctionCount; j++){
-            if(nextUrl != "" || isAfterStartingDate(getDateFromUrl(nextUrl))){
+            if(nextUrl != "" && isAfterStartingDate(getDateFromUrl(nextUrl))){
                 nextUrl = await scrape(nextUrl);
             }
             else{
@@ -205,13 +221,13 @@ async function main() : Promise<void>{
         }
     }
     //write all the data to a file
-    writeCSV(fileName, finalResult);
+    //await writeCSV(fileName, finalResult);
+    //await appendCSV(fileName, finalResult);
 }
 
 
 (async () => {
-    appendCSV(1, 1);
-    //await main();
+    await main();
     console.log("DONE");
     process.exit(0);
 })();
